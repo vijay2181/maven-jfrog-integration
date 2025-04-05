@@ -532,3 +532,82 @@ root@8e9c567a9eed:~/artifactory-demo# curl -u jfrog:Test@jfrog123 \
 
 ```
 
+
+
+
+```
+To make the script dynamic such that the version is passed, and the rest of the process adjusts accordingly, you can modify the script like this:
+
+Key Points:
+Version Input: The version will be passed as an input argument.
+
+Dynamic Plugin Processing: The script will adjust based on the passed version for all plugins.
+
+Updated Script:
+bash
+Copy
+Edit
+#!/bin/bash
+
+# Pass the version as an argument, e.g., ./script.sh 3.8.1
+PLUGIN_VERSION=$1
+
+# Ensure version is passed
+if [ -z "$PLUGIN_VERSION" ]; then
+  echo "Please provide a version as an argument (e.g., 3.8.1)"
+  exit 1
+fi
+
+# Create a temporary directory
+mkdir -p ~/maven-plugins
+cd ~/maven-plugins
+
+# List of essential plugins without versions
+plugins=(
+  "maven-clean-plugin"
+  "maven-resources-plugin"
+  "maven-compiler-plugin"
+  "maven-surefire-plugin"
+  "maven-install-plugin"
+  "maven-deploy-plugin"
+  "maven-site-plugin"
+)
+
+# Download and upload each plugin dynamically for the given version
+for plugin in "${plugins[@]}"; do
+  PLUGIN_GROUP="org/apache/maven/plugins"
+  
+  echo "Processing $plugin:$PLUGIN_VERSION"
+
+  # Download plugin POM and JAR for the given version
+  wget https://repo1.maven.org/maven2/${PLUGIN_GROUP}/${plugin}/${PLUGIN_VERSION}/${plugin}-${PLUGIN_VERSION}.pom
+  wget https://repo1.maven.org/maven2/${PLUGIN_GROUP}/${plugin}/${PLUGIN_VERSION}/${plugin}-${PLUGIN_VERSION}.jar
+
+  # Upload to Artifactory
+  jf rt upload ${plugin}-${PLUGIN_VERSION}.pom maven-local/${PLUGIN_GROUP}/${plugin}/${PLUGIN_VERSION}/
+  jf rt upload ${plugin}-${PLUGIN_VERSION}.jar maven-local/${PLUGIN_GROUP}/${plugin}/${PLUGIN_VERSION}/
+done
+
+# Clean up
+cd ~
+rm -rf ~/maven-plugins
+
+# Verify Virtual Repository Configuration
+jf rt curl -XGET /api/repositories/maven-virtual | jq .repositories
+
+# Test with a Simple Command
+mvn -U help:effective-settings
+Key Changes:
+Version Passed as Argument: The version is now passed as a command-line argument when running the script (./script.sh 3.8.1). This version is then used for all plugins in the list.
+
+Dynamic Processing: For each plugin in the list, the script fetches the specified version and performs the necessary operations dynamically.
+
+How to Run:
+To run the script, simply pass the version you want to use:
+
+bash
+Copy
+Edit
+./script.sh 3.8.1
+This will download the plugins for version 3.8.1 and upload them to Artifactory. If you need a different version, just pass that as an argument.
+```
